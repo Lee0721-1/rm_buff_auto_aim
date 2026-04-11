@@ -1,0 +1,116 @@
+# ======================================================================
+# 能量机关自瞄系统参数配置文件
+# 用于 buff_detector、buff_predictor、buff_solver 三个节点
+# ======================================================================
+
+# -------------------- 检测节点 (buff_detector) --------------------
+buff_detector_node:
+  ros__parameters:
+    detector:
+      # 调试模式：是否显示图像窗口和发布调试话题
+      debug: true
+
+      # YOLO 模型置信度阈值，低于此值的检测框将被过滤
+      conf_thresh: 0.5
+
+      # NMS（非极大值抑制）IoU 阈值，用于合并重叠框
+      iou_thresh: 0.5
+
+      # 内部遮罩半径比例（相对于能量机关半径），用于遮挡中心 R 标区域
+      inside_shade_rate: 0.7
+
+      # 外部遮罩半径比例，用于遮挡外围干扰
+      outside_shade_rate: 1.39
+
+      # 图像膨胀操作的核大小，用于连接断裂的轮廓
+      dilate_kernel: 7
+
+      # 最大允许连续丢失帧数，超过此值将重新初始化检测器
+      max_lost_frame: 5
+
+      # YOLO 模型文件路径（相对于功能包根目录或绝对路径）
+      model_path: "model/Fan.onnx"
+
+      # HSV 颜色空间下限，用于二值化提取目标颜色
+      hsv_lower: [0, 40, 220]
+
+      # HSV 颜色空间上限
+      hsv_upper: [70, 255, 255]
+
+
+# -------------------- 预测节点 (buff_predictor) --------------------
+buff_predictor_node:
+  ros__parameters:
+    # 物理常量
+    physics:
+      # 能量机关旋转半径（米），即扇叶中心到 R 标中心的距离
+      arm_length: 1.5
+
+      # R 标物理半径（米），用于深度估计（目前未使用）
+      r_radius: 0.1
+
+    # 预测算法参数
+    predictor:
+      # 开始拟合所需的最小连续跟踪时间（秒），用于收集足够的数据点
+      fit_start_time: 1.5
+
+      # 最小角速度阈值（rad/s），用于异常值过滤
+      min_omega: 1.884
+
+      # Levenberg-Marquardt 算法最大迭代次数
+      lm_maxfev: 12000
+
+      # LM 算法收敛容差（参数变化量小于此值时停止迭代）
+      lm_xtol: 1.0e-7
+
+    # 相机内参（需要根据实际相机标定结果填写）
+    camera:
+      fx: 1303.675          # 焦距 X（像素）
+      fy: 1303.675          # 焦距 Y（像素）
+      cx: 720.0             # 主点 X 坐标（像素）
+      cy: 540.0             # 主点 Y 坐标（像素）
+
+    # 坐标系名称
+    frames:
+      world: "odom"                      # 世界坐标系（里程计系）
+      camera: "camera_optical_frame"     # 相机光学坐标系
+
+    # 调试模式开关：是否输出 CSV 日志和发布调试点
+    debug_mode: false
+
+
+# -------------------- 自瞄求解节点 (buff_solver) --------------------
+buff_solver_node:
+  ros__parameters:
+    # 弹道模型参数
+    ballistic:
+      # 子弹初速（m/s）
+      bullet_speed: 15.0
+
+      # 发射机构机械/电路延迟（秒）
+      shoot_delay: 0.05
+
+      # 重力加速度（m/s²）
+      gravity: 9.81
+
+      # 空气阻力系数 k，公式：F_air = -k * v
+      air_k: 0.001
+
+      # 弹道迭代收敛阈值：飞行时间变化小于此值时停止迭代（秒）
+      converge_thresh: 0.002
+
+      # 弹道仿真步长（秒）
+      sim_dt: 0.005
+
+    # 自瞄控制参数
+    aiming:
+      # 是否发布调试话题（/autoaim/debug）
+      debug: true
+
+    # 坐标系名称
+    frames:
+      odom: "odom"                      # 输入目标坐标的参考系
+      gimbal: "gimbal_yaw_link"         # 云台 yaw 关节坐标系（枪口 +X，Z 向上）
+
+    # 能量机关物理旋转半径（米），与 predictor 中的 arm_length 保持一致
+    physical_radius: 1.5
