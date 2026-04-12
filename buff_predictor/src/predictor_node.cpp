@@ -239,3 +239,6 @@ int main(int argc, char** argv)
     rclcpp::shutdown();
     return 0;
 }
+// 注册为组件
+#include "rclcpp_components/register_node_macro.hpp"
+RCLCPP_COMPONENTS_REGISTER_NODE(BuffPredictorNode)

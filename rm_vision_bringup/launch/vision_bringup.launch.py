@@ -65,11 +65,18 @@ def generate_launch_description():
             # ---- buff 能量机关自瞄组件 ----
             ComposableNode(
                 package='buff_detector',
-                plugin='BuffDetector',
+                plugin='BuffDetectorNode',
                 name='buff_detector_node',
                 parameters=[buff_param],
                 extra_arguments=[{'use_intra_process_comms': True}]
             ),
+            ComposableNode(
+                package='buff_predictor',
+                plugin='BuffPredictorNode',
+                name='buff_predictor_node',
+                parameters=[buff_param],
+                extra_arguments=[{'use_intra_process_comms': True}]
+),
             ComposableNode(
                 package='buff_solver',
                 plugin='BuffSolver',

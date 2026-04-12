@@ -9,9 +9,10 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# 查找 ROS2 依赖
+# ------------------------- 查找依赖 -------------------------
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)          # 组件支持
 find_package(buff_interfaces REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
@@ -19,21 +20,12 @@ find_package(image_transport REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 
-# ============================================================================
-# 【临时修改区】ONNX Runtime 路径与检测逻辑
-# 正式环境恢复方法：删除本区域代码，取消下面三行的注释并填写正确路径
-# ============================================================================
-# 原正式代码：
-# set(ONNXRUNTIME_ROOT "/home/caleb/onnxruntime")
-# include_directories(${ONNXRUNTIME_ROOT}/include)
-# link_directories(${ONNXRUNTIME_ROOT}/lib)
-
-# 【新增】灵活查找 ONNX Runtime，未找到则只编译模拟节点
+# ------------------------- ONNX Runtime 查找 -------------------------
+# 优先使用环境变量，否则尝试常见路径
 if(NOT DEFINED ONNXRUNTIME_ROOT)
   set(ONNXRUNTIME_ROOT $ENV{ONNXRUNTIME_ROOT})
 endif()
 if(NOT ONNXRUNTIME_ROOT)
-  # 尝试几个常见路径，若都不存在则 ONNXRUNTIME_FOUND 为 FALSE
   set(_possible_paths
     /opt/onnxruntime
     /usr/local/onnxruntime
@@ -59,11 +51,8 @@ if(ONNXRUNTIME_ROOT AND EXISTS "${ONNXRUNTIME_ROOT}/include/onnxruntime_cxx_api.
     message(STATUS "ONNX Runtime found: ${ONNXRUNTIME_ROOT}")
   endif()
 endif()
-# ============================================================================
-# 【临时修改区结束】
-# ============================================================================
 
-# 全局包含目录（OpenCV、cv_bridge 等始终需要）
+# ------------------------- 全局包含目录 -------------------------
 include_directories(
   include
   ${OpenCV_INCLUDE_DIRS}
@@ -72,67 +61,66 @@ include_directories(
   ${sensor_msgs_INCLUDE_DIRS}
 )
 
-# ----------------------------------------------------------------------------
-# 根据 ONNX Runtime 是否存在，决定编译目标
-# ----------------------------------------------------------------------------
-if(ONNXRUNTIME_FOUND)
-  # ========== 正式模式：编译完整的 buff_detector ==========
-  message(STATUS "Building full buff_detector with ONNX Runtime support.")
+
+message(STATUS "Building full buff_detector with ONNX Runtime support.")
   
-  include_directories(${ONNXRUNTIME_ROOT}/include)
-  link_directories(${ONNXRUNTIME_ROOT}/lib)
+include_directories(${ONNXRUNTIME_ROOT}/include)
+link_directories(${ONNXRUNTIME_ROOT}/lib)
 
-  add_executable(buff_detector
-    src/detector_node.cpp
-    src/detector.cpp
-    src/yolo_inference.cpp
-  )
+  # ----- 创建共享库（用于组件注册） -----
+add_library(${PROJECT_NAME}_lib SHARED
+  src/detector_node.cpp
+  src/detector.cpp
+  src/yolo_inference.cpp
+)
 
-  ament_target_dependencies(buff_detector
-    rclcpp
-    buff_interfaces
-    OpenCV
-    cv_bridge
-    image_transport
-    sensor_msgs
-    std_msgs
-  )
+target_include_directories(${PROJECT_NAME}_lib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 
-  target_link_libraries(buff_detector ${ONNXRUNTIME_LIB})
+ament_target_dependencies(${PROJECT_NAME}_lib
+  rclcpp
+  rclcpp_components
+  buff_interfaces
+  OpenCV
+  cv_bridge
+  image_transport
+  sensor_msgs
+  std_msgs
+)
 
-  set_target_properties(buff_detector PROPERTIES
-    BUILD_RPATH ${ONNXRUNTIME_ROOT}/lib
-    INSTALL_RPATH ${ONNXRUNTIME_ROOT}/lib
-  )
+target_link_libraries(${PROJECT_NAME}_lib
+  ${ONNXRUNTIME_LIB}
+)
 
-  install(TARGETS buff_detector
-    DESTINATION lib/${PROJECT_NAME}
-  )
+set_target_properties(${PROJECT_NAME}_lib PROPERTIES
+  BUILD_RPATH ${ONNXRUNTIME_ROOT}/lib
+  INSTALL_RPATH ${ONNXRUNTIME_ROOT}/lib
+)
 
-else()
-  # ========== 临时模式：仅编译模拟节点 mock_detector ==========
-  # 【临时修改】正式环境请删除此 else 分支，并确保 ONNXRUNTIME_FOUND 为真
-  message(WARNING "ONNX Runtime NOT found! Building mock_detector node only for testing.")
-  
-  add_executable(mock_detector
-    src/mock_detector_node.cpp
-  )
+# ----- 注册组件 -----
+rclcpp_components_register_node(${PROJECT_NAME}_lib
+  PLUGIN "BuffDetectorNode"
+  EXECUTABLE buff_detector_node
+)
 
-  ament_target_dependencies(mock_detector
-    rclcpp
-    buff_interfaces
-  )
+# ----- 安装库和可执行文件 -----
+install(TARGETS ${PROJECT_NAME}_lib
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
 
-  install(TARGETS mock_detector
-    DESTINATION lib/${PROJECT_NAME}
-  )
-  
-endif()
-# ----------------------------------------------------------------------------
 
-# 安装模型文件（正式环境需要）
+
+# ------------------------- 公共安装 -------------------------
 install(DIRECTORY model
   DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/
+  DESTINATION include/${PROJECT_NAME}
 )
 
 if(BUILD_TESTING)
