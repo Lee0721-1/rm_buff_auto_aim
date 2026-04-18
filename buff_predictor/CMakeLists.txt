@@ -3,63 +3,76 @@ project(buff_predictor)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-# ------------------------- 查找依赖 -------------------------
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+#######################
+## Find dependencies ##
+#######################
+
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rclcpp_components REQUIRED)          
+find_package(rclcpp_components REQUIRED)   # 组件支持
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)       
+find_package(Eigen3 REQUIRED)
+find_package(OpenCV REQUIRED)
+find_package(Ceres REQUIRED)
 find_package(buff_interfaces REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(OpenCV REQUIRED)
-find_package(Eigen3 REQUIRED)
 
-# ------------------------- 包含目录 -------------------------
-include_directories(
-  include
-  ${OpenCV_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIRS}
-)
+###########
+## Build ##
+###########
 
-# ------------------------- 创建共享库（组件） -------------------------
-add_library(${PROJECT_NAME}_lib SHARED
-  src/predictor_node.cpp
+# 创建共享库（供组件使用）
+add_library(${PROJECT_NAME}_component SHARED
   src/predictor.cpp
   src/dataProcessor.cpp
+  src/predictor_node.cpp
 )
 
-target_include_directories(${PROJECT_NAME}_lib PUBLIC
+target_include_directories(${PROJECT_NAME}_component PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIR}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
-ament_target_dependencies(${PROJECT_NAME}_lib
+ament_target_dependencies(${PROJECT_NAME}_component
   rclcpp
   rclcpp_components
-  buff_interfaces
-  tf2_ros
-  tf2_geometry_msgs
+  std_msgs
   geometry_msgs
   sensor_msgs
-  OpenCV
-  Eigen3
+  tf2_ros
+  tf2_geometry_msgs
+  buff_interfaces
 )
 
-# ------------------------- 注册组件 -------------------------
-rclcpp_components_register_node(${PROJECT_NAME}_lib
+target_link_libraries(${PROJECT_NAME}_component
+  ${OpenCV_LIBS}
+  Ceres::ceres
+)
+
+# 注册组件（自动生成可执行文件 buff_predictor_node）
+rclcpp_components_register_node(${PROJECT_NAME}_component
   PLUGIN "BuffPredictorNode"
   EXECUTABLE buff_predictor_node
 )
 
-# ------------------------- 安装 -------------------------
-install(TARGETS ${PROJECT_NAME}_lib
+#############
+## Install ##
+#############
+
+install(TARGETS ${PROJECT_NAME}_component
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
@@ -69,9 +82,16 @@ install(DIRECTORY include/
   DESTINATION include/${PROJECT_NAME}
 )
 
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  ament_lint_auto_find_test_dependencies()
-endif()
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME}_component)
+ament_export_dependencies(
+  rclcpp
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  tf2_ros
+  Eigen3
+  Ceres
+)
 
 ament_package()

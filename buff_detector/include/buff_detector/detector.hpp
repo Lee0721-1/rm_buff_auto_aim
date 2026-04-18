@@ -1,17 +1,50 @@
 #pragma once
 
 #include <opencv2/opencv.hpp>
+#include <string>
+#include <cstdint>
 
+struct BuffDetectorConfig
+{
+    std::string model_path = "src/buff_detector/model/Fan.onnx";
+    bool use_cuda = false;
+    float confidence_threshold = 0.5f;
+    float iou_threshold = 0.5f;
+    bool debug_mode = true;
+    float inside_shade_rate = 0.7f;
+    float outside_shade_rate = 1.39f;
+    cv::Scalar lower_hsv = cv::Scalar(0, 40, 220);
+    cv::Scalar upper_hsv = cv::Scalar(70, 255, 255);
+    int dilate_kernel_size = 7;
+    int max_lost_frame = 5;
+};
 
+float euclidean_distance(const cv::Point2f& p1, const cv::Point2f& p2); // 计算两点间的欧氏距离
+cv::Point2f rotate_point(
+    const cv::Point2f& point, const cv::Point2f& center, float angle_rad
+); // 一点绕中心点旋转指定弧度
 
-float euclidean_distance(const cv::Point2f& p1, const cv::Point2f& p2);
-cv::Point2f rotate_point(const cv::Point2f& point, const cv::Point2f& center, float angle_rad);
+enum class IoU_Type
+{
+    IoU,
+    GIoU,
+    DIoU,
+    CIoU
+};
 
-enum class IoU_Type { IoU, GIoU, DIoU, CIoU };
+enum class FanBladeState
+{
+    target,    // 目标扇叶
+    unlighted, // 未点亮扇叶
+    shotted,   // 已击打扇叶
+    unknow      // 无状态
+};
 
-enum class FanBladeState { target, unlighted, shotted, none };
-
-enum class BuffType { small_buff, big_buff };
+enum class BuffType
+{
+    small_buff, // 小能量机关 
+    big_buff    // 大能量机关
+};
 
 class RotationRectangle
 {
@@ -63,65 +96,59 @@ float DIoU(const BBox& box1, const BBox& box2);
 float CIoU(const BBox& box1, const BBox& box2);
 std::vector<std::pair<BBox, float>> compare_by_IoU(
     const BBox& last_box, const std::vector<BBox>& boxes,
-    const IoU_Type& iou_type = IoU_Type::IoU);
+    const IoU_Type& iou_type = IoU_Type::IoU
+); // 根据IoU值比较并排序目标列表
 
-struct FanBlade {
-    BBox box;
-    FanBladeState state = FanBladeState::none;
-    int id = -1;
+struct FanBlade
+{
+    BBox box;                                  // 扇叶框
+    FanBladeState state = FanBladeState::unknow; // 扇叶状态
+    int id = -1;                               // 扇叶ID
 };
 
-class BuffDetector {
-public:
-    // 构造函数接收所有可调参数
-    BuffDetector(
-        bool debug,
-        double conf_thresh,
-        double iou_thresh,
-        double inside_shade_rate,
-        double outside_shade_rate,
-        int dilate_kernel,
-        int max_lost_frame,
-        const std::string& model_path,
-        const cv::Scalar& lower_hsv,
-        const cv::Scalar& upper_hsv
-    );
-
-    bool init(cv::Mat& frame);
-    bool update(cv::Mat& frame);
-    BBox get_first_target_blade_bbox() const;
-    const std::vector<FanBlade>& get_target_fan_blades() const;
-    BBox get_current_R_box() const;
-    float get_radius() const;
-    const cv::Mat& get_debug_frame() const;
-
+class BuffDetector
+{
 private:
-    // 参数成员
-    bool debug_;
-    double conf_thresh_;
-    double iou_thresh_;
-    double inside_shade_rate_;
-    double outside_shade_rate_;
-    int dilate_kernel_;
-    int max_lost_frame_;
-    std::string model_path_;
-    cv::Scalar lower_hsv_;
-    cv::Scalar upper_hsv_;
+    BBox current_R_box_;                                    // 当前R标框
+    BBox last_R_box_;                                       // 上一帧R标框
+    std::vector<FanBlade> target_blades_;                   // 目标扇叶列表
+    std::vector<FanBlade> blade_list_;                      // 所有扇叶框
+    float buff_radius_ = 0.0f;                              // 能量机关半径（R标到扇叶中心的距离）
+    int lighted_blade_num_ = 0;                             // 亮起的扇叶数量
+                            // 记录亮起过的最大扇叶数量，用于判断是否结束
+    int lost_frame_count_ = 0;                              // 目标丢失帧数
+    uint8_t spin_direction_ = 0;                            // 旋转方向: 0=unknown, -1=人眼anticlockwise, 1=人眼clockwise
+    uint8_t pending_spin_direction_ = 0;                    // 候选方向
+    int pending_direction_count_ = 0;                       // 候选方向连续计数
+    int direction_confirm_frames_ = 3;                      // 连续确认帧数（稳定优先）
+    float last_target_angle_ = 0.0f;                        // 上一帧目标角度
+    bool has_last_target_angle_ = false;                    // 是否已初始化上一帧目标角度
+    float min_valid_angle_step_ = 0.003f;                   // 有效角度变化下限（抑制抖动）
+                                    // 调试帧图像
+    BuffType buff_type_ = BuffType::small_buff;             // 能量机关类型
+    BuffDetectorConfig config_;
 
-    // 状态成员
-    BBox current_R_box_;
-    BBox last_R_box_;
-    std::vector<FanBlade> target_blades_;
-    std::vector<FanBlade> blade_list_;
-    float buff_radius_ = 0.0f;
-    int lighted_blade_num_ = 0;
-    int lost_frame_count_ = 0;
-    cv::Mat debug_frame_;
-    BuffType buff_type_ = BuffType::small_buff;
+    bool detect_by_yolo(cv::Mat& frame);                            // 使用yolo模型获取扇叶和R标初始位置
+    bool preprocess_image(cv::Mat& frame);                          // 获取预处理后的二值图
+    bool update_R_box(cv::Mat& image, bool is_init = false);        // 获取R标框
+    bool update_fan_blades(cv::Mat& image);                         // 检测扇叶位置
+    void reset_spin_direction_state();                               // 重置方向状态机
+    void update_spin_direction_by_target_id();                       // 根据目标扇叶ID更新方向
+    
 
-    // 内部方法
-    bool detect_by_yolo(cv::Mat& frame);
-    bool preprocess_image(cv::Mat& frame);
-    bool update_R_box(cv::Mat& image, bool is_init = false);
-    bool update_fan_blades(cv::Mat& image);
+public:
+    BuffDetector() = default;
+    void set_config(const BuffDetectorConfig& config) { config_ = config; }
+
+    bool init(cv::Mat& frame);                                               // 初始化检测器
+    bool update(cv::Mat& frame);                                             // 更新检测结果
+    BBox get_first_target_blade_bbox() const                                  // 获取首个目标扇叶框
+    {return target_blades_.empty() ? BBox() : target_blades_.front().box;}
+    const std::vector<FanBlade>& get_target_fan_blades() const { return target_blades_; }
+    BBox get_current_R_box() const { return current_R_box_; }                // 获取当前R标框
+    float get_radius() const { return buff_radius_; }                             // 获取能量机关半径
+    uint8_t get_spin_direction() const { return spin_direction_; }
+    cv::Mat debug_frame_;             // 获取调试图像
+    int max_lighted_blade_num_ = 0; 
+    BuffType get_buff_type() const { return buff_type_; } // 获取当前buff模式
 };

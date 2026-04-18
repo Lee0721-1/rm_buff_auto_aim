@@ -102,10 +102,10 @@ private:
         double msg_latency = (this->now() - msg_stamp).seconds();
         if (msg_latency < 0.0) msg_latency = 0.0;
 
-        // 2. 初始飞行时间估计
+        // 2. 初始飞行时间估计（使用 R 标中心）
         geometry_msgs::msg::Point r_center_in_gimbal;
         if (!transformPoint(
-                msg->r_center_x_3d, msg->r_center_y_3d, msg->r_center_z_3d,
+                msg->r_x_3d, msg->r_y_3d, msg->r_z_3d,
                 msg_stamp, r_center_in_gimbal)) {
             publishZeroCommand(std::move(autoaim_msg));
             return;
@@ -222,31 +222,34 @@ private:
         }
     }
 
-    geometry_msgs::msg::Point predictTargetPosition(
-        const buff_interfaces::msg::BuffAimingData& msg, double delta_t) {
-        double theta0 = std::atan2(msg.target_y_3d - msg.r_center_y_3d,
-                                   msg.target_x_3d - msg.r_center_x_3d);
+geometry_msgs::msg::Point predictTargetPosition(
+    const buff_interfaces::msg::BuffAimingData& msg, double delta_t) {
+    // 当前角度（R 标中心到目标的方向）
+    double theta0 = std::atan2(msg.target_y_3d - msg.r_y_3d,
+                               msg.target_x_3d - msg.r_x_3d);
 
-        double a = msg.sin_a;
-        double omega = msg.sin_omega;
-        double phi   = msg.sin_phi;
-        double b     = msg.sin_b;
+    double a = msg.sin_a;
+    double omega = msg.sin_omega;
+    double phi   = msg.sin_phi;
+    double b     = msg.sin_b;
+    
+    // 使用拟合开始时间（速度函数的时间零点）
+    double t0 = msg.fit_start_time_sec;
+    double t_pred = t0 + delta_t;
 
-        double t0 = rclcpp::Time(msg.header.stamp).seconds();
-        double t_pred = t0 + delta_t;
+    double cos_pred = std::cos(omega * t_pred + phi);
+    double cos_t0   = std::cos(omega * t0 + phi);
+    double delta_theta = b * delta_t - (a / omega) * (cos_pred - cos_t0);
 
-        double cos_pred = std::cos(omega * t_pred + phi);
-        double cos_t0   = std::cos(omega * t0 + phi);
-        double delta_theta = b * delta_t - (a / omega) * (cos_pred - cos_t0);
+    double theta_pred = theta0 + delta_theta;
 
-        double theta_pred = theta0 + delta_theta;
-
-        geometry_msgs::msg::Point p;
-        p.x = msg.r_center_x_3d + physical_radius_ * std::cos(theta_pred);
-        p.y = msg.r_center_y_3d + physical_radius_ * std::sin(theta_pred);
-        p.z = msg.r_center_z_3d;
-        return p;
-    }
+    geometry_msgs::msg::Point p;
+    // 修正：预测位置 = R标中心 + 半径向量
+    p.x = msg.r_x_3d + physical_radius_ * std::cos(theta_pred);
+    p.y = msg.r_y_3d + physical_radius_ * std::sin(theta_pred);
+    p.z = msg.r_z_3d;
+    return p;
+}
 
     BallisticResult solveBallistic(double distance_xy, double distance_z) {
         const double v0 = bullet_speed_;

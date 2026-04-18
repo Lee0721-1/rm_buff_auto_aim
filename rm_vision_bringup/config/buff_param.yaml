@@ -6,77 +6,47 @@
 # -------------------- 检测节点 (buff_detector) --------------------
 buff_detector_node:
   ros__parameters:
-    detector:
-      # 调试模式：是否显示图像窗口和发布调试话题
-      debug: true
-
-      # YOLO 模型置信度阈值，低于此值的检测框将被过滤
-      conf_thresh: 0.5
-
-      # NMS（非极大值抑制）IoU 阈值，用于合并重叠框
-      iou_thresh: 0.5
-
-      # 内部遮罩半径比例（相对于能量机关半径），用于遮挡中心 R 标区域
+      model_path: src/buff_detector/model/Fan.onnx
+      use_cuda: false
+      confidence_threshold: 0.5
+      iou_threshold: 0.5
+      debug_mode: true
       inside_shade_rate: 0.7
-
-      # 外部遮罩半径比例，用于遮挡外围干扰
       outside_shade_rate: 1.39
-
-      # 图像膨胀操作的核大小，用于连接断裂的轮廓
-      dilate_kernel: 7
-
-      # 最大允许连续丢失帧数，超过此值将重新初始化检测器
+      lower_h: 0
+      lower_s: 40
+      lower_v: 220
+      upper_h: 70
+      upper_s: 255
+      upper_v: 255
+      dilate_kernel_size: 7
       max_lost_frame: 5
+      debug_image_frame_id: camera
 
-      # YOLO 模型文件路径（相对于功能包根目录或绝对路径）
-      model_path: "model/Fan.onnx"
-
-      # HSV 颜色空间下限，用于二值化提取目标颜色
-      hsv_lower: [0, 40, 220]
-
-      # HSV 颜色空间上限
-      hsv_upper: [70, 255, 255]
 
 
 # -------------------- 预测节点 (buff_predictor) --------------------
 buff_predictor_node:
   ros__parameters:
-    # 物理常量
-    physics:
-      # 能量机关旋转半径（米），即扇叶中心到 R 标中心的距离
-      arm_length: 1.5
-
-      # R 标物理半径（米），用于深度估计（目前未使用）
-      r_radius: 0.1
-
-    # 预测算法参数
-    predictor:
-      # 开始拟合所需的最小连续跟踪时间（秒），用于收集足够的数据点
-      fit_start_time: 1.5
-
-      # 最小角速度阈值（rad/s），用于异常值过滤
-      min_omega: 1.884
-
-      # Levenberg-Marquardt 算法最大迭代次数
-      lm_maxfev: 12000
-
-      # LM 算法收敛容差（参数变化量小于此值时停止迭代）
-      lm_xtol: 1.0e-7
-
-    # 相机内参（需要根据实际相机标定结果填写）
-    camera:
-      fx: 1303.675          # 焦距 X（像素）
-      fy: 1303.675          # 焦距 Y（像素）
-      cx: 720.0             # 主点 X 坐标（像素）
-      cy: 540.0             # 主点 Y 坐标（像素）
-
-    # 坐标系名称
-    frames:
-      world: "odom"                      # 世界坐标系（里程计系）
-      camera: "camera_optical_frame"     # 相机光学坐标系
-
-    # 调试模式开关：是否输出 CSV 日志和发布调试点
-    debug_mode: false
+    target_frame: odom
+    camera_frame: camera_optical_frame
+    debug_mode: true
+    debug_csv_path: buff_predictor_debug.csv
+    physical_arm_length: 1.5
+    velocity_median_window: 3
+    camera_fx: 1303.675283386667
+    camera_fy: 1303.675283386667
+    camera_cx: 720.0
+    camera_cy: 540.0
+    fit_window_sec: 1.5
+    fit_min_samples: 10
+    fit_offset_sum: 2.090
+    fit_a_lower: 0.780
+    fit_a_upper: 1.045
+    fit_omega_lower: 1.884
+    fit_omega_upper: 2.000
+    fit_phi_lower: -3.141592653589793
+    fit_phi_upper: 3.141592653589793
 
 
 # -------------------- 自瞄求解节点 (buff_solver) --------------------
