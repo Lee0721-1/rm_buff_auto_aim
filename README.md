@@ -25,10 +25,12 @@
 onnxruntime下载完成之后配置环境变量cmake就能找到了
 
 ``` nano ~/.bashrc```
-```export ONNXRUNTIME_DIR = '路径'``` 
+
+```export ONNXRUNTIME_DIR ='.../onnxruntime/'```
+
 ```export LD_LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LD_LIBRARY_PATH```
 
-# 能量机关数据解算模块
+# Predictor模块
 
 ## 1.目标：
 
@@ -88,6 +90,11 @@ onnxruntime下载完成之后配置环境变量cmake就能找到了
 计算绝对目标角度（yaw / pitch），结合当前云台角度得到相对差。
 发布 AutoAIM 指令（包含 yaw_diff、pitch_diff、目标距离等）。
 
+# Debug
 
+采用foxgolve
 
+```sudo apt install ros-$ROS_DISTRO-foxglove-bridge```
+
+```ros2 launch foxglove_bridge foxglove_bridge_launch.xml```
 
