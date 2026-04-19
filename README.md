@@ -25,7 +25,8 @@
 onnxruntime下载完成之后配置环境变量cmake就能找到了
 
 ``` nano ~/.bashrc```
-```export ONNXRUNTIME_DIR = '路径'``` bash
+```export ONNXRUNTIME_DIR = '路径'``` 
+```export LD_LIBRARY_PATH=$ONNXRUNTIME_DIR/lib:$LD_LIBRARY_PATH```
 
 # 能量机关数据解算模块
 

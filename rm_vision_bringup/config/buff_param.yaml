@@ -6,7 +6,7 @@
 # -------------------- 检测节点 (buff_detector) --------------------
 buff_detector_node:
   ros__parameters:
-      model_path: src/buff_detector/model/Fan.onnx
+      model_path: model/Fan.onnx
       use_cuda: false
       confidence_threshold: 0.5
       iou_threshold: 0.5

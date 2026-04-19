@@ -1,5 +1,7 @@
 #include "buff_detector/detector.hpp"
 #include "buff_interfaces/msg/buff_target.hpp"
+#include <ament_index_cpp/get_package_share_directory.hpp>
+#include <filesystem>
 #include <opencv2/core/mat.hpp>
 #include <rclcpp/rclcpp.hpp>
 
@@ -22,7 +24,7 @@ public:
     explicit BuffDetectorNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions())
     : Node("buff_detector_node", options)
     {
-        this->declare_parameter<std::string>("model_path", "src/buff_detector/model/Fan.onnx");
+        this->declare_parameter<std::string>("model_path", "model/Fan.onnx");
         this->declare_parameter<bool>("use_cuda", false);
         this->declare_parameter<double>("confidence_threshold", 0.5);
         this->declare_parameter<double>("iou_threshold", 0.5);
@@ -39,7 +41,12 @@ public:
         this->declare_parameter<int>("max_lost_frame", 5);
         this->declare_parameter<std::string>("debug_image_frame_id", "camera");
 
-        detector_config_.model_path = this->get_parameter("model_path").as_string();
+        std::string model_path = this->get_parameter("model_path").as_string();
+        if (std::filesystem::path(model_path).is_relative()) {
+            model_path =
+                ament_index_cpp::get_package_share_directory("buff_detector") + "/" + model_path;
+        }
+        detector_config_.model_path = model_path;
         detector_config_.use_cuda = this->get_parameter("use_cuda").as_bool();
         detector_config_.confidence_threshold =
             static_cast<float>(this->get_parameter("confidence_threshold").as_double());
