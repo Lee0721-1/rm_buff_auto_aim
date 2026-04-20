@@ -15,14 +15,14 @@ def generate_launch_description():
     launch_params = yaml.safe_load(open(os.path.join(
         get_package_share_directory('rm_vision_bringup'), 'config', 'launch_params.yaml')))
     
-    node_params = os.path.join(
-        get_package_share_directory('rm_vision_bringup'), 'config', 'rm_auto_aim_param.yaml')
+    # node_params = os.path.join(
+    #     get_package_share_directory('rm_vision_bringup'), 'config', 'rm_auto_aim_param.yaml')
     
     camera_param = os.path.join(
         get_package_share_directory('rm_vision_bringup'), 'config', 'camera_param.yaml')
     
-    solver_param = os.path.join(
-        get_package_share_directory('rm_vision_bringup'), 'config', 'auto_aim_solver_param.yaml')
+    # solver_param = os.path.join(
+    #     get_package_share_directory('rm_vision_bringup'), 'config', 'auto_aim_solver_param.yaml')
     
     buff_param = os.path.join(
         get_package_share_directory('rm_vision_bringup'), 'config', 'buff_param.yaml')
@@ -41,27 +41,27 @@ def generate_launch_description():
                 name='camera_publisher',
                 parameters=[camera_param]
             ),
-            ComposableNode(
-                package='armor_detector',
-                plugin='rm_auto_aim::ArmorDetectorNode',
-                name='armor_detector_node',
-                parameters=[node_params],
-                extra_arguments=[{'use_intra_process_comms': True}]
-            ),
-            ComposableNode(
-                package='armor_tracker',
-                plugin='rm_auto_aim::ArmorTrackerNode',
-                name='armor_tracker_node',
-                parameters=[node_params],
-                extra_arguments=[{'use_intra_process_comms': True}]
-            ),
-            ComposableNode(
-                package='auto_aim_solver',
-                plugin='AutoAimSolver',
-                name='auto_aim_solver_node',
-                parameters=[solver_param],
-                extra_arguments=[{'use_intra_process_comms': True}]
-            ),
+            # ComposableNode(
+            #     package='armor_detector',
+            #     plugin='rm_auto_aim::ArmorDetectorNode',
+            #     name='armor_detector_node',
+            #     parameters=[node_params],
+            #     extra_arguments=[{'use_intra_process_comms': True}]
+            # ),
+            # ComposableNode(
+            #     package='armor_tracker',
+            #     plugin='rm_auto_aim::ArmorTrackerNode',
+            #     name='armor_tracker_node',
+            #     parameters=[node_params],
+            #     extra_arguments=[{'use_intra_process_comms': True}]
+            # ),
+            # ComposableNode(
+            #     package='auto_aim_solver',
+            #     plugin='AutoAimSolver',
+            #     name='auto_aim_solver_node',
+            #     parameters=[solver_param],
+            #     extra_arguments=[{'use_intra_process_comms': True}]
+            # ),
             # ---- buff 能量机关自瞄组件 ----
             ComposableNode(
                 package='buff_detector',
