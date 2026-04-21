@@ -62,8 +62,9 @@ class Big_Buff_Predictor {
         return time_w_pairs_.empty() ? 0.0f : static_cast<float>(time_w_pairs_.back().first);
     }
     int get_fit_data_point_count() const { return static_cast<int>(time_w_pairs_.size()); }
+    double get_fit_window_sec() const { return fit_window_sec_; }
     };
-
+    
 
 
 float euclidean_distance(cv::Point2f p1, cv::Point2f p2);

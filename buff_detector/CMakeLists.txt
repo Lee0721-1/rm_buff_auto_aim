@@ -18,6 +18,7 @@ find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 
 # ------------------------------------------------------------
 # 强制使用环境变量 ONNXRUNTIME_DIR
@@ -60,6 +61,7 @@ target_include_directories(${PROJECT_NAME}_component PRIVATE
 ament_target_dependencies(${PROJECT_NAME}_component
   rclcpp
   rclcpp_components
+  ament_index_cpp
   buff_interfaces
   cv_bridge
   image_transport

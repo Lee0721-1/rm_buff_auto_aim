@@ -31,15 +31,11 @@ public:
         this->declare_parameter<bool>("debug_mode", true);
         this->declare_parameter<double>("inside_shade_rate", 0.7);
         this->declare_parameter<double>("outside_shade_rate", 1.39);
-        this->declare_parameter<int>("lower_h", 0);
-        this->declare_parameter<int>("lower_s", 40);
-        this->declare_parameter<int>("lower_v", 220);
-        this->declare_parameter<int>("upper_h", 70);
-        this->declare_parameter<int>("upper_s", 255);
-        this->declare_parameter<int>("upper_v", 255);
+        this->declare_parameter<std::vector<int64_t>>("hsv_limits.lower", {0, 40, 220});
+        this->declare_parameter<std::vector<int64_t>>("hsv_limits.upper", {70, 255, 255});
         this->declare_parameter<int>("dilate_kernel_size", 7);
         this->declare_parameter<int>("max_lost_frame", 5);
-        this->declare_parameter<std::string>("debug_image_frame_id", "camera");
+
 
         std::string model_path = this->get_parameter("model_path").as_string();
         if (std::filesystem::path(model_path).is_relative()) {
@@ -57,17 +53,19 @@ public:
             static_cast<float>(this->get_parameter("inside_shade_rate").as_double());
         detector_config_.outside_shade_rate =
             static_cast<float>(this->get_parameter("outside_shade_rate").as_double());
+            auto lower_vec = this->get_parameter("hsv_limits.lower").as_integer_array();
+            auto upper_vec = this->get_parameter("hsv_limits.upper").as_integer_array();    
         detector_config_.lower_hsv = cv::Scalar(
-            this->get_parameter("lower_h").as_int(),
-            this->get_parameter("lower_s").as_int(),
-            this->get_parameter("lower_v").as_int());
+            lower_vec[0],
+            lower_vec[1],
+            lower_vec[2]);
         detector_config_.upper_hsv = cv::Scalar(
-            this->get_parameter("upper_h").as_int(),
-            this->get_parameter("upper_s").as_int(),
-            this->get_parameter("upper_v").as_int());
+            upper_vec[0],
+            upper_vec[1],
+            upper_vec[2]);
         detector_config_.dilate_kernel_size = this->get_parameter("dilate_kernel_size").as_int();
         detector_config_.max_lost_frame = this->get_parameter("max_lost_frame").as_int();
-        //debug_image_frame_id_ = this->get_parameter("debug_image_frame_id").as_string();
+
 
         // 初始化检测器
         detector_ = std::make_unique<BuffDetector>();
@@ -167,7 +165,7 @@ private:
             {
                 auto debug_img_msg = cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", detector_->debug_frame_).toImageMsg();
                 debug_img_msg->header.stamp = frame_stamp;
-                debug_img_msg->header.frame_id = debug_image_frame_id_;
+                debug_img_msg->header.frame_id = "camera";
                 debug_image_pub_.publish(debug_img_msg);
             }
           
@@ -195,8 +193,6 @@ private:
 
     image_transport::Publisher debug_image_pub_;
     
-    std::string debug_image_frame_id_ = "camera";    
-
     bool is_tracking_ = false;
     cv::Mat video_frame_;
 };

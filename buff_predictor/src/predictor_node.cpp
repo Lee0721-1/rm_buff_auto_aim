@@ -30,54 +30,42 @@ public:
         this->declare_parameter<double>("physical_arm_length", 1.5);
         this->declare_parameter<std::string>("debug_csv_path", "buff_predictor_debug.csv");
         this->declare_parameter<int>("velocity_median_window", 3);
-        this->declare_parameter<double>("camera_fx", 1303.675283386667);
-        this->declare_parameter<double>("camera_fy", 1303.675283386667);
-        this->declare_parameter<double>("camera_cx", 720.0);
-        this->declare_parameter<double>("camera_cy", 540.0);
+        this->declare_parameter<std::vector<double>>("camera_info", {1303.675, 1303.675, 720.0, 540.0});
         this->declare_parameter<double>("fit_window_sec", 1.5);
         this->declare_parameter<int>("fit_min_samples", 10);
         this->declare_parameter<double>("fit_offset_sum", 2.090);
-        this->declare_parameter<double>("fit_a_lower", 0.780);
-        this->declare_parameter<double>("fit_a_upper", 1.045);
-        this->declare_parameter<double>("fit_omega_lower", 1.884);
-        this->declare_parameter<double>("fit_omega_upper", 2.000);
-        this->declare_parameter<double>("fit_phi_lower", -M_PI);
-        this->declare_parameter<double>("fit_phi_upper", M_PI);
+        this->declare_parameter<std::vector<double>>("fit_a_range", {0.780, 1.045});
+        this->declare_parameter<std::vector<double>>("fit_omega_range", {1.884, 2.000});
+        this->declare_parameter<std::vector<double>>("fit_phi_range", {-M_PI, M_PI});
         target_frame_ = this->get_parameter("target_frame").as_string();
         camera_frame_ = this->get_parameter("camera_frame").as_string();
         debug_mode_ = this->get_parameter("debug_mode").as_bool();
         physical_arm_length_ = this->get_parameter("physical_arm_length").as_double();
         debug_csv_path_ = this->get_parameter("debug_csv_path").as_string();
         velocity_median_window_ = this->get_parameter("velocity_median_window").as_int();
-        camera_fx_ = this->get_parameter("camera_fx").as_double();
-        camera_fy_ = this->get_parameter("camera_fy").as_double();
-        camera_cx_ = this->get_parameter("camera_cx").as_double();
-        camera_cy_ = this->get_parameter("camera_cy").as_double();
-        fit_window_sec_ = this->get_parameter("fit_window_sec").as_double();
-        fit_min_samples_ = this->get_parameter("fit_min_samples").as_int();
-        fit_offset_sum_ = this->get_parameter("fit_offset_sum").as_double();
-        fit_a_lower_ = this->get_parameter("fit_a_lower").as_double();
-        fit_a_upper_ = this->get_parameter("fit_a_upper").as_double();
-        fit_omega_lower_ = this->get_parameter("fit_omega_lower").as_double();
-        fit_omega_upper_ = this->get_parameter("fit_omega_upper").as_double();
-        fit_phi_lower_ = this->get_parameter("fit_phi_lower").as_double();
-        fit_phi_upper_ = this->get_parameter("fit_phi_upper").as_double();
+        auto cam_vec = this->get_parameter("camera_info").as_double_array();
+        auto fit_window_sec = this->get_parameter("fit_window_sec").as_double();
+        auto fit_min_samples = this->get_parameter("fit_min_samples").as_int();
+        auto fit_offset_sum = this->get_parameter("fit_offset_sum").as_double();
+        auto fit_a_range = this->get_parameter("fit_a_range").as_double_array();
+        auto fit_omega_range = this->get_parameter("fit_omega_range").as_double_array();
+        auto fit_phi_range = this->get_parameter("fit_phi_range").as_double_array();
 
         velocity_median_filter_ =
             std::make_unique<MedianFilter>(std::max(1, velocity_median_window_));
         predictor_->set_fit_config(
-            fit_offset_sum_,
-            fit_window_sec_,
-            fit_min_samples_,
-            fit_a_lower_,
-            fit_a_upper_,
-            fit_omega_lower_,
-            fit_omega_upper_,
-            fit_phi_lower_,
-            fit_phi_upper_);
+            fit_offset_sum,
+            fit_window_sec,
+            fit_min_samples,
+            fit_a_range[0],
+            fit_a_range[1],
+            fit_omega_range[0],
+            fit_omega_range[1],
+            fit_phi_range[0],
+            fit_phi_range[1]);
 
         // 坐标转换初始化
-        CoordinateSolver::CameraIntrinsics coord_params = {camera_fx_, camera_fy_, camera_cx_, camera_cy_};
+        CoordinateSolver::CameraIntrinsics coord_params = {cam_vec[0], cam_vec[1], cam_vec[2], cam_vec[3]};
         coord_solver_ = std::make_unique<CoordinateSolver>(coord_params, physical_arm_length_);
 
     
@@ -126,7 +114,7 @@ private:
                 target_frame_,
                 input.header.frame_id,
                 stamp,
-                tf2::durationFromSec(0.05)
+                tf2::durationFromSec(0.1)
             );
             tf2::doTransform(input, output, tf_stamped);
             return true;
@@ -233,7 +221,7 @@ private:
             }
 
             time_since_start_ = now - fit_start_time_; // 第一帧这个值为0
-            if (!predictor_->has_fit_attempted() && time_since_start_ > 0 && time_since_start_ < fit_window_sec_) {
+            if (!predictor_->has_fit_attempted() && time_since_start_ > 0 && time_since_start_ < predictor_->get_fit_window_sec()) {
                 double median_time = (last_time_since_start_ + time_since_start_) / 2.0;
                 float mean_angleVelocity =
                     (continues_angle - last_angle_) / (time_since_start_ - last_time_since_start_);
@@ -246,7 +234,7 @@ private:
 
                 predictor_->time_w_pairs_.push_back(time_w_pair);
             }
-            if (!predictor_->is_completed() && time_since_start_ >= fit_window_sec_) {
+            if (!predictor_->is_completed() && time_since_start_ >= predictor_->get_fit_window_sec()) {
                 predictor_->try_fit_once_at_1p5s();
                 if(debug_mode_){
                     debug_csv_<<'\n' << predictor_->get_velocity_fit_params()[0] << ","
@@ -342,19 +330,6 @@ private:
     double physical_arm_length_ = 1.5;
     std::string debug_csv_path_ = "buff_predictor_debug.csv";
     int velocity_median_window_ = 3;
-    double camera_fx_ = 1303.675283386667;
-    double camera_fy_ = 1303.675283386667;
-    double camera_cx_ = 720.0;
-    double camera_cy_ = 540.0;
-    double fit_window_sec_ = 1.5;
-    int fit_min_samples_ = 10;
-    double fit_offset_sum_ = 2.090;
-    double fit_a_lower_ = 0.780;
-    double fit_a_upper_ = 1.045;
-    double fit_omega_lower_ = 1.884;
-    double fit_omega_upper_ = 2.000;
-    double fit_phi_lower_ = -M_PI;
-    double fit_phi_upper_ = M_PI;
 
     std::ofstream debug_csv_;
     bool isFirst_frame_ = true;
