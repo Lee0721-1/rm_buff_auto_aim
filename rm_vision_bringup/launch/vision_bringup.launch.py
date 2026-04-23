@@ -79,7 +79,7 @@ def generate_launch_description():
 ),
             ComposableNode(
                 package='buff_solver',
-                plugin='BuffSolver',
+                plugin='BuffSolverNode',
                 name='buff_solver_node',
                 parameters=[buff_param],
                 extra_arguments=[{'use_intra_process_comms': True}]
